@@ -1,16 +1,24 @@
 use concrete_core::{crypto::encoding::Plaintext, math::random::RandomGenerator};
-use crossterm::{cursor, QueueableCommand};
 use elisabeth::{u4, Encrypter, SystemParameters, Torus, LWE};
 use std::{
     env,
-    io::{stdout, Write},
+    io::{stdout, Write, BufWriter},
     time::Instant,
 };
+use std::fs::File;
+use crossterm::{cursor, QueueableCommand};
+
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let nb_nibble = args[1].parse().unwrap();
+    // Open a file for writing
+    let file = File::create("homomorphic.log").unwrap();
+    let mut writer = BufWriter::new(file);
+    writer.write_all(b"Saving cursor position\n").unwrap();
 
+    let args: Vec<String> = env::args().collect();
+    let nb_nibble = args[2].parse().unwrap();
+    writer.write_all(format!("Number of nibbles: {:?}\n", nb_nibble).as_bytes()).unwrap();
+    
     let mut stdout = stdout();
     stdout.queue(cursor::SavePosition).unwrap();
     stdout
@@ -18,18 +26,19 @@ fn main() {
         .unwrap();
     stdout.queue(cursor::RestorePosition).unwrap();
     stdout.flush().unwrap();
+    writer
+        .write(format!("Generating FHE keys...                       ").as_bytes())
+        .unwrap();
 
     #[cfg(not(feature = "single_key"))]
     let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
     #[cfg(feature = "single_key")]
     let ((sk, std_dev_lwe), pk) = SystemParameters::n60.generate_fhe_keys();
 
-    stdout.queue(cursor::SavePosition).unwrap();
-    stdout
+    println!("Generating Elisabeth keys: ");
+    writer
         .write(format!("Generating Elisabeth keys...                 ").as_bytes())
         .unwrap();
-    stdout.queue(cursor::RestorePosition).unwrap();
-    stdout.flush().unwrap();
 
     let (mut encrypter, mut decrypter) = Encrypter::<u4>::new::<LWE>(
         &SystemParameters::n60,
@@ -38,12 +47,10 @@ fn main() {
         Some(pk),
     );
 
-    stdout.queue(cursor::SavePosition).unwrap();
-    stdout
+    println!("Generating message: ");
+    writer
         .write(format!("Generating message...                        ").as_bytes())
         .unwrap();
-    stdout.queue(cursor::RestorePosition).unwrap();
-    stdout.flush().unwrap();
 
     // message
     let mut generator = RandomGenerator::new(None);
@@ -54,24 +61,19 @@ fn main() {
         .map(|f| u4(*f))
         .collect::<Vec<u4>>();
 
+    writer
+        .write(format!("Generated message: {:?}\n", message).as_bytes())
+        .unwrap();
+    println!("Generated message: {:?}", message);
+
     let mut ciphertext = vec![u4(0); nb_nibble];
     let mut transciphered = vec![LWE::allocate(sk.key_size().to_lwe_size()); nb_nibble];
 
-    stdout.queue(cursor::SavePosition).unwrap();
-    stdout
-        .write(format!("Encrypting...                                ").as_bytes())
-        .unwrap();
-    stdout.queue(cursor::RestorePosition).unwrap();
-    stdout.flush().unwrap();
-
     encrypter.encrypt(&mut ciphertext, &message);
-
-    stdout.queue(cursor::SavePosition).unwrap();
-    stdout
-        .write(format!("Transciphering...                            ").as_bytes())
+    writer
+        .write(format!("Encrypted message: {:?}\n", ciphertext).as_bytes())
         .unwrap();
-    stdout.queue(cursor::RestorePosition).unwrap();
-    stdout.flush().unwrap();
+    println!("Encrypted message: {:?}", ciphertext);
 
     let now = Instant::now();
     decrypter.decrypt(&mut transciphered, &ciphertext);
@@ -82,6 +84,11 @@ fn main() {
         now.elapsed().as_secs_f64() / (nb_nibble as f64),
         now.elapsed().as_secs_f64() / (4. * nb_nibble as f64),
     );
+    
+    // writer
+    //     .write(format!("Transcrypted message: {:?}\n", transciphered).as_bytes())
+    //     .unwrap();
+    // println!("Transcrypted message: {:?}", transciphered);
 
     let mut errors = 0;
     let sdk_samples = transciphered

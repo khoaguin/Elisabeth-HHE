@@ -4,7 +4,15 @@ use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let nb_nibble = args[1].parse().unwrap();
+
+    // Print the arguments without owning them
+    // for arg in &args {
+    //     println!("arg is {}", arg);
+    // }
+
+    // let nb_nibble = 1000;
+    let nb_nibble = args[2].parse().unwrap();
+    println!("Number of nibbles: {}", nb_nibble);
 
     let (mut encryptor, mut decryptor) =
         Encrypter::<u4>::new::<u4>(&SystemParameters::n60, None, None, None);
