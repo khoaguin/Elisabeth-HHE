@@ -18,6 +18,7 @@ rayon = {version = "1.5.1", optional = true}
 criterion = {version = "0.3", features = ["html_reports"]}
 pprof = { version = "0.5.0", features = ["flamegraph", "criterion"] }
 crossterm = "0.21.0"
+chrono = "0.4.22"
 
 [[test]]
 name = "clear"

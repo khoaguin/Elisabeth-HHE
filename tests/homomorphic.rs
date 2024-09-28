@@ -7,12 +7,18 @@ use std::{
     io::{BufWriter, Write},
     time::Instant,
 };
+use chrono;
 
 fn main() {
     // ------ Open a file for writing logs ------
+    use chrono::Local;
+    let log_file_fmt: &str = "%Y-%m-%d_%H-%M-%S";
+    let current_date: String = Local::now().format(log_file_fmt).to_string();
+    let log_file_name: String = format!("logs/homomorphic_{}.log", current_date);
     fs::create_dir_all("logs").expect("Failed to create logs directory");
-    let file = File::create("logs/homomorphic.log").unwrap();
+    let file = File::create(&log_file_name).unwrap();
     let mut writer = BufWriter::new(file);
+    println!("Logging to {}", log_file_name);
 
     // ------ Get number of nibbles from command line ------
     let args: Vec<String> = env::args().collect();
@@ -53,18 +59,20 @@ fn main() {
         .map(|f| u4(*f))
         .collect::<Vec<u4>>();
 
+    let message_numbers: Vec<u8> = message.iter().map(|u| u.0).collect();
     writer
-        .write(format!("Generated message: {:?}\n", message).as_bytes())
+        .write(format!("Generated message: {:?}\n", message_numbers).as_bytes())
         .unwrap();
-    println!("Generated message: {:?}", message);
+    println!("Generated message: {:?}", message_numbers);
 
     // ------ Encrypt the message into symmetric ciphertext ------
     let mut ciphertext = vec![u4(0); nb_nibble];
     encrypter.encrypt(&mut ciphertext, &message);
+    let ciphertext_numbers: Vec<u8> = ciphertext.iter().map(|u| u.0).collect();
     writer
-        .write(format!("Encrypted message: {:?}\n", ciphertext).as_bytes())
+        .write(format!("Symmetric ciphertext: {:?}\n", ciphertext_numbers).as_bytes())
         .unwrap();
-    println!("Encrypted message: {:?}", ciphertext);
+    println!("Symmetric ciphertext: {:?}", ciphertext_numbers);
 
     // ------ Transcribe the message (turning the symmetric ciphertext into an LWE ciphertext) ------
     writer
