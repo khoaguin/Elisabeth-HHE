@@ -110,12 +110,13 @@ impl<T: 'static + Nibble> Encrypter<T> {
         }
     }
 
+    /// Generate a stream of pseudo-random values that are used in the encryption process
     fn stream(&mut self) -> T {
         let key_round = self.symmetric_key.random_whitened_subset();
         self.filter.call(&key_round, self.public_key.as_ref())
     }
 
-    /// Encrypts the given vector of plaintexts.
+    /// Symmetrically encrypts the given vector of plaintexts.
     pub fn encrypt(&mut self, res: &mut [T], message: &[u4]) {
         for (c, m) in res.iter_mut().zip(message.iter()) {
             *c = self.stream();

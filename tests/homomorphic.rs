@@ -1,45 +1,37 @@
 use concrete_core::{crypto::encoding::Plaintext, math::random::RandomGenerator};
 use elisabeth::{u4, Encrypter, SystemParameters, Torus, LWE};
+use std::fs;
+use std::fs::File;
 use std::{
     env,
-    io::{stdout, Write, BufWriter},
+    io::{BufWriter, Write},
     time::Instant,
 };
-use std::fs::File;
-use crossterm::{cursor, QueueableCommand};
-
 
 fn main() {
-    // Open a file for writing
-    let file = File::create("homomorphic.log").unwrap();
+    // ------ Open a file for writing logs ------
+    fs::create_dir_all("logs").expect("Failed to create logs directory");
+    let file = File::create("logs/homomorphic.log").unwrap();
     let mut writer = BufWriter::new(file);
-    writer.write_all(b"Saving cursor position\n").unwrap();
 
+    // ------ Get number of nibbles from command line ------
     let args: Vec<String> = env::args().collect();
     let nb_nibble = args[2].parse().unwrap();
-    writer.write_all(format!("Number of nibbles: {:?}\n", nb_nibble).as_bytes()).unwrap();
-    
-    let mut stdout = stdout();
-    stdout.queue(cursor::SavePosition).unwrap();
-    stdout
-        .write(format!("Generating FHE keys...                       ").as_bytes())
-        .unwrap();
-    stdout.queue(cursor::RestorePosition).unwrap();
-    stdout.flush().unwrap();
     writer
-        .write(format!("Generating FHE keys...                       ").as_bytes())
+        .write_all(format!("Number of nibbles: {:?}\n", nb_nibble).as_bytes())
         .unwrap();
 
+    // ------ Generate Elisabeth keys ------
+    println!("Generating Elisabeth keys...");
+    writer
+        .write(format!("Generating Elisabeth keys...\n").as_bytes())
+        .unwrap();
     #[cfg(not(feature = "single_key"))]
     let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
     #[cfg(feature = "single_key")]
     let ((sk, std_dev_lwe), pk) = SystemParameters::n60.generate_fhe_keys();
 
-    println!("Generating Elisabeth keys: ");
-    writer
-        .write(format!("Generating Elisabeth keys...                 ").as_bytes())
-        .unwrap();
-
+    // ------ Create encrypter and decrypter ------
     let (mut encrypter, mut decrypter) = Encrypter::<u4>::new::<LWE>(
         &SystemParameters::n60,
         Some(&sk),
@@ -47,12 +39,12 @@ fn main() {
         Some(pk),
     );
 
-    println!("Generating message: ");
+    // ------ Generate the plaintext message ------
+    println!("Generating message...");
     writer
-        .write(format!("Generating message...                        ").as_bytes())
+        .write(format!("Generating message...\n").as_bytes())
         .unwrap();
 
-    // message
     let mut generator = RandomGenerator::new(None);
     let message = generator
         .random_uniform_n_lsb_tensor::<u8>(nb_nibble, 4)
@@ -66,15 +58,23 @@ fn main() {
         .unwrap();
     println!("Generated message: {:?}", message);
 
+    // ------ Encrypt the message into symmetric ciphertext ------
     let mut ciphertext = vec![u4(0); nb_nibble];
-    let mut transciphered = vec![LWE::allocate(sk.key_size().to_lwe_size()); nb_nibble];
-
     encrypter.encrypt(&mut ciphertext, &message);
     writer
         .write(format!("Encrypted message: {:?}\n", ciphertext).as_bytes())
         .unwrap();
     println!("Encrypted message: {:?}", ciphertext);
 
+    // ------ Transcribe the message (turning the symmetric ciphertext into an LWE ciphertext) ------
+    writer
+        .write(
+            format!("Transcribing: Turning the symmetric ciphertext into an LWE ciphertext...\n")
+                .as_bytes(),
+        )
+        .unwrap();
+    println!("Transcribing: Turning the symmetric ciphertext into an LWE ciphertext...");
+    let mut transciphered: Vec<LWE> = vec![LWE::allocate(sk.key_size().to_lwe_size()); nb_nibble];
     let now = Instant::now();
     decrypter.decrypt(&mut transciphered, &ciphertext);
     println!(
@@ -84,13 +84,18 @@ fn main() {
         now.elapsed().as_secs_f64() / (nb_nibble as f64),
         now.elapsed().as_secs_f64() / (4. * nb_nibble as f64),
     );
-    
-    // writer
-    //     .write(format!("Transcrypted message: {:?}\n", transciphered).as_bytes())
-    //     .unwrap();
-    // println!("Transcrypted message: {:?}", transciphered);
 
+    writer
+        .write(format!("Transcrypted message size: {:?}\n", transciphered.len()).as_bytes())
+        .unwrap();
+    println!("Transciphered message size: {:?}", transciphered.len());
+
+    // ------ Perform decryption and error checking on the homomorphically encrypted data. ------
+    writer.write(format!("Performing decryption and error checking on the homomorphically encrypted data...\n").as_bytes()).unwrap();
+    println!("Performing decryption and error checking on the homomorphically encrypted data...");
+    
     let mut errors = 0;
+    let mut decoded_vec: Vec<u64> = vec![0; nb_nibble];
     let sdk_samples = transciphered
         .iter_mut()
         .zip(message.iter())
@@ -111,10 +116,15 @@ fn main() {
             if decoded as u8 != mes.0 {
                 errors += 1;
             }
+            decoded_vec.push(decoded);
             torus_modular_distance(encoded.0, (mes.0 as u64) << 60)
         })
         .collect::<Vec<_>>();
+    
+    writer.write(format!("Decrypted message: {:?}\n", decoded_vec).as_bytes()).unwrap();
+    println!("Decrypted message: {:?}", decoded_vec);
 
+    // ------ Compute the mean and std of our errors ------
     // compute the mean of our errors
     let mut mean: f64 = sdk_samples.iter().sum();
     mean /= sdk_samples.len() as f64;
@@ -123,15 +133,39 @@ fn main() {
     let mut sdk_variance: f64 = sdk_samples.iter().map(|x| f64::powi(x - mean, 2)).sum();
     sdk_variance /= (sdk_samples.len() - 1) as f64;
 
+    println!("Mean: {:?}", mean);
+    writer
+        .write(format!("Mean: {:?}\n", mean).as_bytes())
+        .unwrap();
+
     // compute the standard deviation
     let sdk_std_log2 = f64::log2(f64::sqrt(sdk_variance));
-
+    writer
+        .write(
+            format!(
+                "Standard deviation of the noise of the outputs: 2^{}\n",
+                sdk_std_log2
+            )
+            .as_bytes(),
+        )
+        .unwrap();
     println!(
         "Standard deviation of the noise of the outputs: 2^{}.",
         sdk_std_log2
     );
 
     if errors > 0 {
+        writer
+            .write(
+                format!(
+                    "{} error{} over {} nibbles.\n",
+                    errors,
+                    if errors > 1 { "s" } else { "" },
+                    nb_nibble
+                )
+                .as_bytes(),
+            )
+            .unwrap();
         panic!(
             "{} error{} over {} nibbles.",
             errors,
