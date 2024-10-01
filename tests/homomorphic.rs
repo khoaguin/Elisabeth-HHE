@@ -28,7 +28,7 @@ fn main() {
 
     // ------ Generate Elisabeth keys ------
     println!("Generating Elisabeth keys...");
-    write_flush(&mut writer, "Generating Elisabeth keys...");
+    write_flush(&mut writer, "Generating Elisabeth keys...\n");
     #[cfg(not(feature = "single_key"))]
     let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
     #[cfg(feature = "single_key")]
@@ -44,7 +44,7 @@ fn main() {
 
     // ------ Generate the plaintext message ------
     println!("Generating message...");
-    write_flush(&mut writer, "Generating message...");
+    write_flush(&mut writer, "Generating message...\n");
     writer.flush().unwrap();
 
     let mut generator = RandomGenerator::new(None);
@@ -140,23 +140,12 @@ fn main() {
     );
 
     if errors > 0 {
-        writer
-            .write(
-                format!(
-                    "{} error{} over {} nibbles.\n",
-                    errors,
-                    if errors > 1 { "s" } else { "" },
-                    nb_nibble
-                )
-                .as_bytes(),
-            )
-            .unwrap();
-        panic!(
-            "{} error{} over {} nibbles.",
+        let error_message = format!("{} error(s) over {} nibbles.",
             errors,
-            if errors > 1 { "s" } else { "" },
             nb_nibble
         );
+        write_flush(&mut writer, &error_message);
+        panic!("{:?}", error_message);
     }
 
     println!("Done!");
