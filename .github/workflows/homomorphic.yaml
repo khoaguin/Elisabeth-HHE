@@ -1,4 +1,4 @@
-name: CI - E2E
+name: Homomorphic tests
 
 on:
   push:
@@ -43,3 +43,21 @@ jobs:
 
     - name: Build and run tests
       run: cargo test --release homomorphic -- 5
+
+    - name: Collect logs
+      # if: failure()
+      shell: bash
+      run: |
+        mkdir -p ./output-logs
+        if [ -d "logs" ]; then
+          cp -R logs/* ./output-logs/
+        else
+          echo "Log directory not found"
+        fi
+
+    - name: Upload logs to GitHub
+      uses: actions/upload-artifact@v2
+      # if: failure()
+      with:
+        name: homomorphic-test-logs-${{ runner.os }}-${{ github.run_id }}
+        path: ./output-logs/
