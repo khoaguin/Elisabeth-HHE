@@ -38,5 +38,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-index-
 
+    - name: Install FFTW 
+      run: sudo apt-get update && sudo apt-get install -y libfftw3-dev
+
     - name: Build and run tests
       run: cargo test --release homomorphic -- 5
