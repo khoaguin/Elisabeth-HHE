@@ -23,15 +23,12 @@ fn main() {
     // ------ Get number of nibbles from command line ------
     let args: Vec<String> = env::args().collect();
     let nb_nibble = args[2].parse().unwrap();
-    writer
-        .write_all(format!("Number of nibbles: {:?}\n", nb_nibble).as_bytes())
-        .unwrap();
+    write_flush(&mut writer, &format!("Number of nibbles: {:?}\n", nb_nibble));
+    print!("Number of nibbles: {:?}\n", nb_nibble);
 
     // ------ Generate Elisabeth keys ------
     println!("Generating Elisabeth keys...");
-    writer
-        .write(format!("Generating Elisabeth keys...\n").as_bytes())
-        .unwrap();
+    write_flush(&mut writer, "Generating Elisabeth keys...");
     #[cfg(not(feature = "single_key"))]
     let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
     #[cfg(feature = "single_key")]
@@ -47,9 +44,8 @@ fn main() {
 
     // ------ Generate the plaintext message ------
     println!("Generating message...");
-    writer
-        .write(format!("Generating message...\n").as_bytes())
-        .unwrap();
+    write_flush(&mut writer, "Generating message...");
+    writer.flush().unwrap();
 
     let mut generator = RandomGenerator::new(None);
     let message = generator
@@ -60,48 +56,39 @@ fn main() {
         .collect::<Vec<u4>>();
 
     let message_numbers: Vec<u8> = message.iter().map(|u| u.0).collect();
-    writer
-        .write(format!("Generated message: {:?}\n", message_numbers).as_bytes())
-        .unwrap();
+    write_flush(&mut writer, &format!("Generated message: {:?}\n", message_numbers));
     println!("Generated message: {:?}", message_numbers);
 
     // ------ Encrypt the message into symmetric ciphertext ------
     let mut ciphertext = vec![u4(0); nb_nibble];
     encrypter.encrypt(&mut ciphertext, &message);
     let ciphertext_numbers: Vec<u8> = ciphertext.iter().map(|u| u.0).collect();
-    writer
-        .write(format!("Symmetric ciphertext: {:?}\n", ciphertext_numbers).as_bytes())
-        .unwrap();
+    write_flush(&mut writer, &format!("Symmetric ciphertext: {:?}\n", ciphertext_numbers));
     println!("Symmetric ciphertext: {:?}", ciphertext_numbers);
 
     // ------ Transcribe the message (turning the symmetric ciphertext into an LWE ciphertext) ------
-    writer
-        .write(
-            format!("Transcribing: Turning the symmetric ciphertext into an LWE ciphertext...\n")
-                .as_bytes(),
-        )
-        .unwrap();
-    println!("Transcribing: Turning the symmetric ciphertext into an LWE ciphertext...");
+    write_flush(&mut writer, &format!("Transcrypting: Turning the symmetric ciphertext into an LWE ciphertext...\n"));
+    println!("Transcrypting: Turning the symmetric ciphertext into an LWE ciphertext...");
     let mut transciphered: Vec<LWE> = vec![LWE::allocate(sk.key_size().to_lwe_size()); nb_nibble];
     let now = Instant::now();
     decrypter.decrypt(&mut transciphered, &ciphertext);
-    println!(
-        "{} nibbles transcrypted in {} s. ({} s/nibble, {} s/b)",
+    let transcryption_info = format!(
+        "{} nibbles transcrypted in {} s. ({} s/nibble, {} s/b)\n",
         nb_nibble,
         now.elapsed().as_secs(),
         now.elapsed().as_secs_f64() / (nb_nibble as f64),
         now.elapsed().as_secs_f64() / (4. * nb_nibble as f64),
     );
+    print!("{transcryption_info}");
+    write_flush(&mut writer, &transcryption_info);
 
-    writer
-        .write(format!("Transcrypted message size: {:?}\n", transciphered.len()).as_bytes())
-        .unwrap();
-    println!("Transciphered message size: {:?}", transciphered.len());
+    write_flush(&mut writer, &format!("Transcrypted message size: {:?}\n", transciphered.len()));
+    println!("Transcrypted message size: {:?}", transciphered.len());
 
     // ------ Perform decryption and error checking on the homomorphically encrypted data. ------
-    writer.write(format!("Performing decryption and error checking on the homomorphically encrypted data...\n").as_bytes()).unwrap();
+    write_flush(&mut writer, &format!("Performing decryption and error checking on the homomorphically encrypted data...\n"));
     println!("Performing decryption and error checking on the homomorphically encrypted data...");
-    
+
     let mut errors = 0;
     let mut decoded_vec: Vec<u64> = vec![0; nb_nibble];
     let sdk_samples = transciphered
@@ -129,7 +116,7 @@ fn main() {
         })
         .collect::<Vec<_>>();
     
-    writer.write(format!("Decrypted message: {:?}\n", decoded_vec).as_bytes()).unwrap();
+    write_flush(&mut writer, &format!("Decrypted message: {:?}\n", decoded_vec));
     println!("Decrypted message: {:?}", decoded_vec);
 
     // ------ Compute the mean and std of our errors ------
@@ -142,21 +129,11 @@ fn main() {
     sdk_variance /= (sdk_samples.len() - 1) as f64;
 
     println!("Mean: {:?}", mean);
-    writer
-        .write(format!("Mean: {:?}\n", mean).as_bytes())
-        .unwrap();
+    write_flush(&mut writer, &format!("Mean: {:?}\n", mean));
 
     // compute the standard deviation
     let sdk_std_log2 = f64::log2(f64::sqrt(sdk_variance));
-    writer
-        .write(
-            format!(
-                "Standard deviation of the noise of the outputs: 2^{}\n",
-                sdk_std_log2
-            )
-            .as_bytes(),
-        )
-        .unwrap();
+    write_flush(&mut writer, &format!("Standard deviation of the noise of the outputs: 2^{}.\n", sdk_std_log2));
     println!(
         "Standard deviation of the noise of the outputs: 2^{}.",
         sdk_std_log2
@@ -181,6 +158,10 @@ fn main() {
             nb_nibble
         );
     }
+
+    println!("Done!");
+    write_flush(&mut writer, &format!("Done!"));
+
 }
 
 fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
@@ -193,4 +174,9 @@ fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
         let d: f64 = d1 as f64;
         -d / 2_f64.powi(Torus::BITS as i32)
     }
+}
+
+fn write_flush(writer: &mut BufWriter<File>, message: &str) {
+    writer.write(message.as_bytes()).unwrap();
+    writer.flush().unwrap();
 }
