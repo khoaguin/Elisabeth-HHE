@@ -219,6 +219,7 @@ impl SystemParameters {
 
     #[cfg(feature = "single_key")]
     pub fn generate_fhe_keys(&self) -> ((LweSecretKey<Vec<bool>>, StandardDev), PublicKey) {
+        println!("Using Single KeySwitch key");
         let env_var = env::var("KEY_DIRECTORY").ok();
         let path = env_var.as_ref().map(|s| &**s);
 
@@ -227,6 +228,7 @@ impl SystemParameters {
             .unwrap_or(false);
 
         if key_stored {
+            print!("loading keys from {}", key_stored);
             let sk_serialized =
                 fs::read(format!("{}/keys/secret/secret_key", path.unwrap())).unwrap();
             let std_dev_serialized =

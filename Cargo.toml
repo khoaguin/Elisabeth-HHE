@@ -28,6 +28,14 @@ harness = false
 name = "homomorphic"
 harness = false
 
+# [[test]]
+# name = "fmnist"
+# harness = false
+
+# [[test]]
+# name = "homomorphic_multi_clients"
+# harness = false
+
 [[bench]]
 name = "benchmark-elisabeth"
 harness = false

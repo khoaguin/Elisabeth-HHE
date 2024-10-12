@@ -11,7 +11,12 @@ fn main() {
     // }
 
     // let nb_nibble = 1000;
-    let nb_nibble = args[2].parse().unwrap();
+    let nb_nibble = args.last()
+    .and_then(|s| s.parse().ok())
+    .unwrap_or_else(|| {
+        println!("No argument provided, using default value of 1000");
+        10
+    });
     println!("Number of nibbles: {}", nb_nibble);
 
     let (mut encryptor, mut decryptor) =

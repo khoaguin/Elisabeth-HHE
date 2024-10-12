@@ -3,3 +3,5 @@ logs/
 *.log
 Cargo.lock
 .vscode/
+*keys/
+experimentals/

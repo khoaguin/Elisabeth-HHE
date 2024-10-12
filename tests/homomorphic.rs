@@ -1,3 +1,5 @@
+// cargo test --features single_key --release homomorphic -- 5
+
 use concrete_core::{crypto::encoding::Plaintext, math::random::RandomGenerator};
 use elisabeth::{u4, Encrypter, SystemParameters, Torus, LWE};
 use std::fs;
@@ -22,13 +24,24 @@ fn main() {
 
     // ------ Get number of nibbles from command line ------
     let args: Vec<String> = env::args().collect();
-    let nb_nibble = args[2].parse().unwrap();
+    let nb_nibble = args.last()
+    .and_then(|s| s.parse().ok())
+    .unwrap_or_else(|| {
+        println!("No argument provided, using default value of 1000");
+        10
+    });
     write_flush(&mut writer, &format!("Number of nibbles: {:?}\n", nb_nibble));
     print!("Number of nibbles: {:?}\n", nb_nibble);
 
     // ------ Generate Elisabeth keys ------
     println!("Generating Elisabeth keys...");
     write_flush(&mut writer, "Generating Elisabeth keys...\n");
+    // Set the key directory
+    let key_dir = "./keys";
+    env::set_var("KEY_DIRECTORY", key_dir);
+    // Create the directory if it doesn't exist
+    std::fs::create_dir_all(key_dir).expect("Failed to create key directory");
+    
     #[cfg(not(feature = "single_key"))]
     let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
     #[cfg(feature = "single_key")]
@@ -66,7 +79,7 @@ fn main() {
     write_flush(&mut writer, &format!("Symmetric ciphertext: {:?}\n", ciphertext_numbers));
     println!("Symmetric ciphertext: {:?}", ciphertext_numbers);
 
-    // ------ Transcribe the message (turning the symmetric ciphertext into an LWE ciphertext) ------
+    // ------ Transcrypting the message (turning the symmetric ciphertext into an LWE ciphertext) ------
     write_flush(&mut writer, &format!("Transcrypting: Turning the symmetric ciphertext into an LWE ciphertext...\n"));
     println!("Transcrypting: Turning the symmetric ciphertext into an LWE ciphertext...");
     let mut transciphered: Vec<LWE> = vec![LWE::allocate(sk.key_size().to_lwe_size()); nb_nibble];
@@ -116,6 +129,9 @@ fn main() {
         })
         .collect::<Vec<_>>();
     
+    // Get only the last nb_nibble elements from decoded_vec
+    decoded_vec = decoded_vec.into_iter().rev().take(nb_nibble).rev().collect();
+
     write_flush(&mut writer, &format!("Decrypted message: {:?}\n", decoded_vec));
     println!("Decrypted message: {:?}", decoded_vec);
 
@@ -153,7 +169,7 @@ fn main() {
 
 }
 
-fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
+pub fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
     let d0 = first.wrapping_sub(other);
     let d1 = other.wrapping_sub(first);
     if d0 < d1 {
@@ -165,7 +181,7 @@ fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
     }
 }
 
-fn write_flush(writer: &mut BufWriter<File>, message: &str) {
+pub fn write_flush(writer: &mut BufWriter<File>, message: &str) {
     writer.write(message.as_bytes()).unwrap();
     writer.flush().unwrap();
 }
