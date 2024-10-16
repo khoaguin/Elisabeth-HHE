@@ -6,6 +6,7 @@ mod filter;
 mod nibble;
 mod public_key;
 mod symmetric_key;
+pub mod utils;
 
 pub type Torus = u64;
 

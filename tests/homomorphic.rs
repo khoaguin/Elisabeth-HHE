@@ -10,6 +10,7 @@ use std::{
     time::Instant,
 };
 use chrono;
+use elisabeth::utils::write_flush;
 
 fn main() {
     // ------ Open a file for writing logs ------
@@ -179,9 +180,4 @@ pub fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
         let d: f64 = d1 as f64;
         -d / 2_f64.powi(Torus::BITS as i32)
     }
-}
-
-pub fn write_flush(writer: &mut BufWriter<File>, message: &str) {
-    writer.write(message.as_bytes()).unwrap();
-    writer.flush().unwrap();
 }
