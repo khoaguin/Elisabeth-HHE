@@ -59,7 +59,7 @@ To run an benchmark, use the following command:
 cargo bench
 ```
 ### Optional features
-By default, Elisabeth runs in two-keyswitching-key, multithreaded mode. To run in single_key, add `--features single_key` right after the `test` or `bench` command. To run in monothread, add `--no-default-features`.
+By default, Elisabeth runs in multithreaded mode. To run in monothread, add `--no-default-features`.
 
 ## How to cite
 More on that soon.

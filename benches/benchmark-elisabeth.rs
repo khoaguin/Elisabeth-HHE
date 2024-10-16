@@ -27,19 +27,11 @@ fn bench_encryption(c: &mut Criterion) {
 }
 
 fn bench_transcryption(c: &mut Criterion) {
-    let mut id = if cfg!(feature = "single_key") {
-        "Elisabeth 60 - Transciphering - Single Keyswitching Key"
-    } else {
-        "Elisabeth 60 - Transciphering - Two Keyswitching Key"
-    }
-    .to_string();
+    let mut id = "Elisabeth 60 - Transciphering - Single Keyswitching Key".to_string();
     if cfg!(not(feature = "multithread")) {
         id += " - Monothreaded";
     }
 
-    #[cfg(not(feature = "single_key"))]
-    let ((sk, std_dev_lwe), _sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
-    #[cfg(feature = "single_key")]
     let ((sk, std_dev_lwe), pk) = SystemParameters::n60.generate_fhe_keys();
 
     let (mut encrypter, mut decrypter) = Encrypter::<u4>::new::<LWE>(

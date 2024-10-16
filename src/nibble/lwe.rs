@@ -119,22 +119,6 @@ impl Nibble for LWE {
         self.0.update_with_neg();
     }
 
-    #[cfg(not(feature = "single_key"))]
-    fn keyswitch(&mut self, pk: Option<&PublicKey>) {
-        if self.0.lwe_size() == pk.as_ref().unwrap().ksk.after_key_size().to_lwe_size() {
-            let mut res =
-                LweCiphertext::allocate(0, pk.unwrap().ksk_inv.after_key_size().to_lwe_size());
-            pk.unwrap().ksk_inv.keyswitch_ciphertext(&mut res, &self.0);
-            *self = LWE(res);
-        } else {
-            let mut res =
-                LweCiphertext::allocate(0, pk.unwrap().ksk.after_key_size().to_lwe_size());
-            pk.unwrap().ksk.keyswitch_ciphertext(&mut res, &self.0);
-            *self = LWE(res);
-        }
-    }
-
-    #[cfg(feature = "single_key")]
     fn keyswitch(&mut self, pk: Option<&PublicKey>) {
         let mut res = LweCiphertext::allocate(0, pk.unwrap().ksk.after_key_size().to_lwe_size());
         pk.unwrap().ksk.keyswitch_ciphertext(&mut res, &self.0);

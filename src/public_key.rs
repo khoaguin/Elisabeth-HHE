@@ -10,6 +10,4 @@ use serde::{Deserialize, Serialize};
 pub struct PublicKey {
     pub bsk: BootstrapKey<Vec<Complex64>>,
     pub ksk: LweKeyswitchKey<Vec<Torus>>,
-    #[cfg(not(feature = "single_key"))]
-    pub ksk_inv: LweKeyswitchKey<Vec<Torus>>,
 }

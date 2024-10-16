@@ -1,7 +1,7 @@
-// cargo test --features single_key --release homomorphic -- 5
+// cargo test --release homomorphic -- 5
 
 use concrete_core::{crypto::encoding::Plaintext, math::random::RandomGenerator};
-use elisabeth::{u4, Encrypter, SystemParameters, Torus, LWE};
+use elisabeth::{u4, Encrypter, SystemParameters, LWE};
 use std::fs;
 use std::fs::File;
 use std::{
@@ -10,7 +10,7 @@ use std::{
     time::Instant,
 };
 use chrono;
-use elisabeth::utils::write_flush;
+use elisabeth::utils::{write_flush, torus_modular_distance};
 
 fn main() {
     // ------ Open a file for writing logs ------
@@ -43,9 +43,6 @@ fn main() {
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(key_dir).expect("Failed to create key directory");
     
-    #[cfg(not(feature = "single_key"))]
-    let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
-    #[cfg(feature = "single_key")]
     let ((sk, std_dev_lwe), pk) = SystemParameters::n60.generate_fhe_keys();
 
     // ------ Create encrypter and decrypter ------
@@ -69,7 +66,7 @@ fn main() {
         .map(|f| u4(*f))
         .collect::<Vec<u4>>();
 
-    let message_numbers: Vec<u8> = message.iter().map(|u| u.0).collect();
+    let message_numbers: Vec<u64> = message.iter().map(|u| u.0 as u64).collect();
     write_flush(&mut writer, &format!("Generated message: {:?}\n", message_numbers));
     println!("Generated message: {:?}", message_numbers);
 
@@ -110,12 +107,7 @@ fn main() {
         .zip(message.iter())
         .map(|(lwe, mes)| {
             let mut encoded = Plaintext(0);
-
-            #[cfg(not(feature = "single_key"))]
-            sk_out.decrypt_lwe(&mut encoded, lwe.as_mut_lwe());
-            #[cfg(feature = "single_key")]
             sk.decrypt_lwe(&mut encoded, lwe.as_mut_lwe());
-
             let mut decoded = encoded.0 >> 59;
             if decoded & 1 == 1 {
                 decoded += 2;
@@ -132,10 +124,10 @@ fn main() {
     
     // Get only the last nb_nibble elements from decoded_vec
     decoded_vec = decoded_vec.into_iter().rev().take(nb_nibble).rev().collect();
-
+    
     write_flush(&mut writer, &format!("Decrypted message: {:?}\n", decoded_vec));
     println!("Decrypted message: {:?}", decoded_vec);
-
+    
     // ------ Compute the mean and std of our errors ------
     // compute the mean of our errors
     let mut mean: f64 = sdk_samples.iter().sum();
@@ -166,18 +158,22 @@ fn main() {
     }
 
     println!("Done!");
-    write_flush(&mut writer, &format!("Done!"));
+    write_flush(&mut writer, &format!("Done!\n"));
 
-}
+    let error_count = message_numbers.iter().zip(decoded_vec.iter())
+    .filter(|&(a, b)| a != b)
+    .count();
 
-pub fn torus_modular_distance(first: Torus, other: Torus) -> f64 {
-    let d0 = first.wrapping_sub(other);
-    let d1 = other.wrapping_sub(first);
-    if d0 < d1 {
-        let d: f64 = d0 as f64;
-        d / 2_f64.powi(Torus::BITS as i32)
+    let result_message = if error_count == 0 {
+        format!("Assertion passed: The original message and the decrypted message match.\n")
     } else {
-        let d: f64 = d1 as f64;
-        -d / 2_f64.powi(Torus::BITS as i32)
+        format!("Assertion failed: {} error(s) over {} nibbles.\nOriginal: {:?}\nDecrypted: {:?}\n", 
+                error_count, message_numbers.len(), message_numbers, decoded_vec)
+    };
+
+    write_flush(&mut writer, &result_message);
+
+    if error_count > 0 {
+        panic!("{}", result_message);
     }
 }

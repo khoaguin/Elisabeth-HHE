@@ -32,9 +32,6 @@ fn main() {
     // Create the directory if it doesn't exist
     std::fs::create_dir_all(key_dir).expect("Failed to create key directory");
     
-    // #[cfg(not(feature = "single_key"))]
-    // let ((sk, std_dev_lwe), sk_out, pk) = SystemParameters::n60.generate_fhe_keys();
-    // #[cfg(feature = "single_key")]
     // let ((sk, std_dev_lwe), pk) = SystemParameters::n60.generate_fhe_keys();
     
 }

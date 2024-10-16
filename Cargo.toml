@@ -47,5 +47,4 @@ lto = "fat"
 
 [features]
 default = ["multithread"]
-single_key = []
 multithread = ["rayon"]

@@ -171,11 +171,7 @@ impl Filter {
     #[cfg(feature = "multithread")]
     pub fn call<T: Nibble>(&self, keyround: &[T], public_key: Option<&PublicKey>) -> T {
         let lwe_size = public_key.map(|pk| {
-            if cfg!(feature = "single_key") {
-                pk.ksk.after_key_size().to_lwe_size()
-            } else {
-                pk.ksk.before_key_size().to_lwe_size()
-            }
+            pk.ksk.after_key_size().to_lwe_size()
         });
 
         keyround
@@ -204,8 +200,6 @@ impl Filter {
         let lwe_dimension = public_key.map(|pk| pk.ksk.before_key_size().to_lwe_size());
 
         let mut last_block = block[self.block_width - 1].clone();
-        #[cfg(not(feature = "single_key"))]
-        last_block.keyswitch(public_key);
 
         let first_layer_output = (0..block.len() - 1)
             .into_par_iter()
@@ -227,7 +221,6 @@ impl Filter {
                 || T::from_u4_with_lwe_size(u4(0), lwe_dimension),
                 |acc, output| acc.add(&output),
             );
-        #[cfg(feature = "single_key")]
         second_layer_output.keyswitch(public_key);
         second_layer_output.add(&last_block)
     }
@@ -236,8 +229,6 @@ impl Filter {
     #[allow(unused_mut)]
     fn filter_block<T: Nibble>(&self, block: &[T], public_key: Option<&PublicKey>) -> T {
         let mut last_block = block[self.block_width - 1].clone();
-        #[cfg(not(feature = "single_key"))]
-        last_block.keyswitch(public_key);
 
         let first_layer_output = (0..block.len() - 1)
             .into_iter()
@@ -257,7 +248,6 @@ impl Filter {
             })
             .reduce(|acc, output| acc.add(&output))
             .unwrap();
-        #[cfg(feature = "single_key")]
         second_layer_output.keyswitch(public_key);
         second_layer_output.add(&last_block)
     }
